@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://example.com/</loc>
+  </url>
+  <url>
+    <loc>https://example.com/project/currency-converter</loc>
+  </url>
+  <url>
+    <loc>https://example.com/project/calculator</loc>
+  </url>
+  <url>
+    <loc>https://example.com/project/edo-ai</loc>
+  </url>
+  <url>
+    <loc>https://example.com/project/cimahub</loc>
+  </url>
+  <url>
+    <loc>https://example.com/project/fitness-coach</loc>
+  </url>
+  <url>
+    <loc>https://example.com/project/ai-website-generator</loc>
+  </url>
+</urlset>

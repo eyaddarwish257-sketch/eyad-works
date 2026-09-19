@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "framework": "vite",
+  "installCommand": "npm install",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "cleanUrls": false,
+  "trailingSlash": false,
+  "rewrites": [
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/"
+    }
+  ]
+}
