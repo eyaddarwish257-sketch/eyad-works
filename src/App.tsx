@@ -40,7 +40,6 @@ import { createCmsRecord, subscribeToPublishedProjects, type CmsRecord } from '.
 import { auth, db } from './lib/firebase'
 import {
   contactLinks,
-  journey,
   portfolioContent,
   projects,
   services,
@@ -265,7 +264,6 @@ function HomePage({
     { key: 'skills', href: '#skills', label: content.nav.skills },
     { key: 'projects', href: '#projects', label: content.nav.projects },
     { key: 'services', href: '#services', label: content.nav.services },
-    { key: 'journey', href: '#journey', label: content.nav.journey },
     { key: 'contact', href: '#contact', label: content.nav.contact },
   ]
 
@@ -377,12 +375,7 @@ function HomePage({
               transition={{ duration: 0.75, ease: 'easeOut' }}
               className="relative z-10"
             >
-              <div className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--card)] px-3 py-2 text-xs font-medium uppercase tracking-[0.2em] text-[var(--muted)] shadow-sm">
-                <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                {content.hero.badge}
-              </div>
-
-              <h1 className="mt-8 max-w-xl text-4xl font-black leading-[0.95] tracking-[-0.06em] text-[var(--heading)] sm:text-5xl lg:text-7xl">
+              <h1 className="mt-0 max-w-xl text-4xl font-black leading-[0.95] tracking-[-0.06em] text-[var(--heading)] sm:text-5xl lg:text-7xl">
                 {content.hero.title}
               </h1>
 
@@ -476,8 +469,6 @@ function HomePage({
         <ProjectsSection language={language} content={content} projects={visibleProjects} />
 
         <ServicesSection language={language} content={content} />
-
-        <JourneySection language={language} content={content} />
 
         <ContactSection language={language} content={content} />
       </main>
@@ -696,30 +687,6 @@ function ServicesSection({ language, content }: { language: Language; content: (
             )
           })}
         </div>
-      </div>
-    </section>
-  )
-}
-
-function JourneySection({ language, content }: { language: Language; content: (typeof portfolioContent)[Language] }) {
-  return (
-    <section id="journey" className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
-      <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">{content.journeySection.label}</p>
-      <h2 className="mt-3 text-3xl font-bold tracking-[-0.05em] text-[var(--heading)] sm:text-4xl">
-        {content.journeySection.heading}
-      </h2>
-
-      <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-        {journey.map((item) => (
-          <motion.div key={item.year} whileHover={{ y: -5 }} className="relative rounded-[1.6rem] border border-[var(--line)] bg-[var(--card)] p-6 shadow-[var(--shadow-soft)]">
-            <div className="absolute left-6 top-6 h-3 w-3 rounded-full bg-[var(--accent)]" />
-            <div className="pl-6">
-              <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">{item.year}</p>
-              <h3 className="mt-3 text-xl font-semibold text-[var(--heading)]">{item.title[language]}</h3>
-              <p className="mt-3 text-sm leading-7 text-[var(--muted)]">{item.content[language]}</p>
-            </div>
-          </motion.div>
-        ))}
       </div>
     </section>
   )

@@ -477,14 +477,6 @@ export const services = [
   { title: { en: 'API & Backend', ar: 'الواجهة الخلفية والـ API' }, description: { en: 'Scalable APIs and backend integrations.', ar: 'واجهات برمجة تطبيقات قابلة للتوسع وتكاملات خلفية.' } }
 ]
 
-export const journey = [
-  { year: 'Learning', title: { en: 'Foundations', ar: 'الأساسيات' }, content: { en: 'Building strong fundamentals in problem solving, logic, and software design.', ar: 'بناء أساسيات قوية في حل المشكلات والمنطق وتصميم البرمجيات.' } },
-  { year: 'Building', title: { en: 'Projects', ar: 'المشاريع' }, content: { en: 'Turning ideas into real products with practical UI, logic, and shipping mindset.', ar: 'تحويل الأفكار إلى منتجات حقيقية بواجهة عملية ومنطق عملي ونهج تسليم.' } },
-  { year: 'Exploring', title: { en: 'Technology', ar: 'التقنيات' }, content: { en: 'Learning new languages, frameworks, and tools to expand flexibility and depth.', ar: 'تعلّم لغات وأطر وأدوات جديدة لتوسيع المرونة والعمق.' } },
-  { year: 'Refining', title: { en: 'UI/UX', ar: 'واجهة المستخدم' }, content: { en: 'Improving visual quality, interaction patterns, and product polish.', ar: 'تحسين الجودة البصرية وأنماط التفاعل واللمسات الاحترافية.' } },
-  { year: 'Growing', title: { en: 'AI', ar: 'الذكاء الاصطناعي' }, content: { en: 'Exploring AI-driven workflows and intelligent user experiences.', ar: 'استكشاف سير العمل المدعومة بالذكاء الاصطناعي وتجارب المستخدم الذكية.' } },
-  { year: 'Shipping', title: { en: 'Real Applications', ar: 'تطبيقات حقيقية' }, content: { en: 'Building products that solve problems with clarity and technical intent.', ar: 'بناء منتجات تحل المشكلات بوضوح وجدية فنية.' } }
-]
 
 export const contactLinks = {
   email: 'eyaddarwish257@gmail.com',
@@ -509,7 +501,7 @@ export const portfolioContent = {
       talk: "Let's Talk"
     },
     hero: {
-      badge: 'Available for opportunities',
+      badge: '',
       title: 'I Build Digital Experiences That Make an Impact.',
       subtitle: 'I create modern web applications, mobile experiences, AI-powered products, and digital solutions with a focus on performance, usability, and clean design.',
       primary: 'View My Work',
@@ -545,10 +537,6 @@ export const portfolioContent = {
     servicesSection: {
       label: 'What I can build',
       heading: 'Services designed around product quality and practical execution.'
-    },
-    journeySection: {
-      label: 'My Development Journey',
-      heading: 'A path of learning, experimenting, building, and refining.'
     },
     contact: {
       label: 'Contact',
@@ -604,7 +592,7 @@ export const portfolioContent = {
       talk: 'تحدث معي'
     },
     hero: {
-      badge: 'متاح للفرص',
+      badge: '',
       title: 'أبني تجارب رقمية تترك أثرًا.',
       subtitle: 'أقوم بإنشاء تطبيقات ويب حديثة وتجارب موبايل ومنتجات مدعومة بالذكاء الاصطناعي وحلول رقمية مع تركيز على الأداء وسهولة الاستخدام وتصميم نظيف.',
       primary: 'عرض مشاريعي',
@@ -640,10 +628,6 @@ export const portfolioContent = {
     servicesSection: {
       label: 'ما الذي أستطيع بناؤه',
       heading: 'خدمات مصممة حول جودة المنتج والتنفيذ العملي.'
-    },
-    journeySection: {
-      label: 'رحلتي في التطوير',
-      heading: 'مسار للتعلّم، التجربة، البناء، والتحسين.'
     },
     contact: {
       label: 'تواصل',
