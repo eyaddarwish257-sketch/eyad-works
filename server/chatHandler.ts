@@ -171,7 +171,7 @@ export async function handleChatRequest(body: unknown, clientKey: string): Promi
         temperature: 0.35,
         max_tokens: 550,
         messages: [
-          { role: 'system', content: `${systemPrompt}\nThe visitor interface language is ${language === 'ar' ? 'Arabic' : 'English'}.\n\nRelevant live Firestore portfolio context for this request:\n${portfolioContext}` },
+          { role: 'system', content: `${systemPrompt}\nThe visitor interface language is ${language === 'ar' ? 'Arabic' : 'English'}.\n\nRelevant live Supabase portfolio context for this request:\n${portfolioContext}` },
           ...messages,
         ],
       }),

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type DragEvent, type FormEvent } from 'react'
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } from 'firebase/auth'
+import type { User } from '@supabase/supabase-js'
 import { Archive, ArrowDown, ArrowUp, ArrowUpRight, Check, Eye, EyeOff, FolderKanban, Image, LayoutDashboard, LogOut, Mail, Menu, MessageSquare, Pencil, Plus, Save, Search, Settings, ShieldCheck, Sparkles, Trash2, Upload, X } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { Language, ThemeMode } from '../data/siteData'
-import { auth, firebaseConfigured } from '../lib/firebase'
+import { supabase, supabaseConfigured } from '../lib/supabase'
 import { createCmsRecord, deleteCmsRecord, deleteStoredImage, subscribeToCollection, updateCmsRecord, uploadProjectImage, type CmsRecord } from '../lib/cms'
 
 type AdminDashboardProps = {
@@ -49,12 +49,15 @@ function inputValue(value: unknown) {
 
 export function AdminDashboard({ language, theme, setTheme, setLanguage }: AdminDashboardProps) {
   const [user, setUser] = useState<User | null>(null)
-  const [authLoading, setAuthLoading] = useState(true)
-  const [email, setEmail] = useState('')
+  const [authLoading, setAuthLoading] = useState(Boolean(supabaseConfigured && supabase))
+  const [email, setEmail] = useState(import.meta.env.VITE_ADMIN_EMAIL || '')
   const [password, setPassword] = useState('')
   const [passwordVisible, setPasswordVisible] = useState(false)
   const [isSigningIn, setIsSigningIn] = useState(false)
+  const [isSendingReset, setIsSendingReset] = useState(false)
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false)
   const [authError, setAuthError] = useState('')
+  const [authNotice, setAuthNotice] = useState('')
   const [section, setSection] = useState<Section>('overview')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [toast, setToast] = useState('')
@@ -66,25 +69,33 @@ export function AdminDashboard({ language, theme, setTheme, setLanguage }: Admin
     const navigate = useNavigate()
     const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || '').trim().toLowerCase()
 
-  useEffect(() => {
-    if (!auth) {
-      setAuthLoading(false)
-      return
-    }
-    return onAuthStateChanged(auth, (nextUser) => {
-      const isAuthorized = Boolean(nextUser && adminEmail && nextUser.email?.toLowerCase() === adminEmail)
-      setUser(isAuthorized ? nextUser : null)
-      setAuthLoading(false)
-      if (nextUser && !isAuthorized) {
-        if (auth) void signOut(auth)
-        setAuthError('This account is not authorized to access the admin dashboard.')
-      } else if (nextUser && location.pathname === '/admin/login') {
-        navigate('/admin', { replace: true })
-      } else if (!nextUser && location.pathname === '/admin') {
-        navigate('/admin/login', { replace: true })
-      }
+    useEffect(() => {
+      const client = supabase
+      if (!supabaseConfigured || !client) return
+
+      const { data: { subscription } } = client.auth.onAuthStateChange((event, session) => {
+        const nextUser = session?.user ?? null
+        const isAuthorized = Boolean(
+          nextUser
+          && adminEmail
+          && nextUser.email?.toLowerCase() === adminEmail
+          && nextUser.app_metadata.role === 'admin',
+        )
+        setUser(isAuthorized ? nextUser : null)
+        setAuthLoading(false)
+
+        if (event === 'PASSWORD_RECOVERY') setIsPasswordRecovery(true)
+        if (nextUser && !isAuthorized) {
+          window.setTimeout(() => { void client.auth.signOut() }, 0)
+          setAuthError('This account is not authorized to access the admin dashboard.')
+        } else if (nextUser && location.pathname === '/admin/login' && event !== 'PASSWORD_RECOVERY') {
+          navigate('/admin', { replace: true })
+        } else if (!nextUser && location.pathname === '/admin') {
+          navigate('/admin/login', { replace: true })
+        }
     })
-    }, [adminEmail, location.pathname, navigate])
+    return () => subscription.unsubscribe()
+  }, [adminEmail, location.pathname, navigate])
 
   useEffect(() => {
     if (!user) return
@@ -103,33 +114,58 @@ export function AdminDashboard({ language, theme, setTheme, setLanguage }: Admin
 
   const login = async (event: FormEvent) => {
     event.preventDefault()
-    if (!auth) return setAuthError('Firebase is not configured. Add the VITE_FIREBASE_* variables and enable Email/Password Authentication.')
+    if (!supabase) return setAuthError('Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.')
     try {
       setAuthError('')
+      setAuthNotice('')
       setIsSigningIn(true)
-      const credential = await signInWithEmailAndPassword(auth, email.trim(), password)
-      if (!adminEmail || credential.user.email?.toLowerCase() !== adminEmail) {
-        await signOut(auth)
-        setAuthError('This account is not authorized to access the admin dashboard.')
+
+      if (isPasswordRecovery) {
+        const { error } = await supabase.auth.updateUser({ password })
+        if (error) {
+          setAuthError(error.message)
+        } else {
+          setIsPasswordRecovery(false)
+          setPassword('')
+          setAuthNotice('Password updated. You can now sign in.')
+        }
+        return
       }
+
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+      if (error) setAuthError('Admin account not found or password incorrect. Create the user in Supabase Auth or reset its password.')
     } catch (error) {
-      const code = error instanceof Error && 'code' in error ? String(error.code) : ''
-      if (code.includes('auth/operation-not-allowed')) {
-        setAuthError('Email/password sign-in is disabled in Firebase Authentication.')
-      } else if (code.includes('auth/user-not-found') || code.includes('auth/invalid-credential')) {
-        setAuthError('This administrator account does not exist yet, or the password is incorrect. Create or reset it in Firebase Authentication.')
-      } else if (code.includes('auth/invalid-api-key') || code.includes('auth/configuration-not-found')) {
-        setAuthError('Firebase Authentication configuration is invalid. Check the Firebase Web App settings.')
-      } else {
-        setAuthError('Unable to sign in. Check Firebase Authentication settings and the administrator account.')
-      }
+      setAuthError(error instanceof Error ? error.message : 'Unable to sign in.')
     } finally {
       setIsSigningIn(false)
     }
   }
 
+  const sendPasswordReset = async () => {
+    if (!supabase) return setAuthError('Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.')
+    if (!adminEmail || email.trim().toLowerCase() !== adminEmail) {
+      setAuthError(`Use the configured administrator email: ${adminEmail || 'VITE_ADMIN_EMAIL is not set'}.`)
+      return
+    }
+
+    try {
+      setAuthError('')
+      setAuthNotice('')
+      setIsSendingReset(true)
+      const { error } = await supabase.auth.resetPasswordForEmail(adminEmail, {
+        redirectTo: `${window.location.origin}/admin/login`,
+      })
+      if (error) throw error
+      setAuthNotice('If an admin account exists, a password reset link has been sent to its email.')
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Unable to send a password reset email.')
+    } finally {
+      setIsSendingReset(false)
+    }
+  }
+
   const logout = async () => {
-    if (auth) await signOut(auth)
+    if (supabase) await supabase.auth.signOut()
     navigate('/admin/login', { replace: true })
   }
 
@@ -146,7 +182,7 @@ export function AdminDashboard({ language, theme, setTheme, setLanguage }: Admin
       else await createCmsRecord(collectionNames[collectionName], data)
       setEditing(null)
       setToast(id ? 'Saved changes.' : 'Created successfully.')
-    } catch { setToast('Unable to save. Check Firebase permissions.') }
+    } catch { setToast('Unable to save. Check Supabase permissions.') }
   }
 
   const removeRecord = async (collectionName: CollectionSection, record: CmsRecord) => {
@@ -167,22 +203,27 @@ export function AdminDashboard({ language, theme, setTheme, setLanguage }: Admin
   }
 
   if (authLoading) return <div className="flex min-h-screen items-center justify-center bg-[var(--bg)] text-sm text-[var(--muted)]">Loading secure dashboard...</div>
-  if (!firebaseConfigured || !user) {
+  if (!supabaseConfigured || !user || isPasswordRecovery) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--bg)] px-4 text-[var(--text)]">
         <form onSubmit={login} className="w-full max-w-md rounded-[2rem] border border-[var(--line)] bg-[var(--card)] p-8 shadow-[var(--shadow-soft)]">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--accent)] text-white"><ShieldCheck size={22} /></div>
           <p className="mt-8 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">Eyad Works CMS</p>
-          <h1 className="mt-3 text-3xl font-black tracking-[-0.05em] text-[var(--heading)]">Secure admin access</h1>
-          <p className="mt-3 text-sm leading-6 text-[var(--muted)]">Sign in with the Firebase administrator account. Credentials are handled by Firebase Authentication.</p>
-          {!firebaseConfigured || !adminEmail ? <p className="mt-6 rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-200">Admin authentication is not configured. Add the Firebase values and VITE_ADMIN_EMAIL.</p> : (
+          <h1 className="mt-3 text-3xl font-black tracking-[-0.05em] text-[var(--heading)]">{isPasswordRecovery ? 'Set a new password' : 'Secure admin access'}</h1>
+          <p className="mt-3 text-sm leading-6 text-[var(--muted)]">Sign in with the configured Supabase administrator account.</p>
+          {!supabaseConfigured || !adminEmail ? <p className="mt-6 rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-200">Admin authentication is not configured. Add VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY, and VITE_ADMIN_EMAIL.</p> : (
             <div className="mt-6 space-y-4">
-              <input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Admin email" className="w-full rounded-xl border border-[var(--line)] bg-[var(--soft)] px-4 py-3 text-sm outline-none focus:border-[var(--accent)]" />
-              <div className="relative"><input required type={passwordVisible ? 'text' : 'password'} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" className="w-full rounded-xl border border-[var(--line)] bg-[var(--soft)] px-4 py-3 pr-11 text-sm outline-none focus:border-[var(--accent)]" /><button type="button" onClick={() => setPasswordVisible((visible) => !visible)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-[var(--muted)] hover:bg-[var(--soft)] hover:text-[var(--heading)]" aria-label={passwordVisible ? 'Hide password' : 'Show password'}>{passwordVisible ? <EyeOff size={16} /> : <Eye size={16} />}</button></div>
-              <button disabled={isSigningIn} className="w-full rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">{isSigningIn ? 'Signing in...' : 'Sign in'}</button>
+              <input required type="email" value={email} disabled={isPasswordRecovery} onChange={(event) => setEmail(event.target.value)} placeholder="Admin email" className="w-full rounded-xl border border-[var(--line)] bg-[var(--soft)] px-4 py-3 text-sm outline-none focus:border-[var(--accent)] disabled:opacity-60" />
+              <div className="relative"><input required minLength={isPasswordRecovery ? 8 : undefined} type={passwordVisible ? 'text' : 'password'} value={password} onChange={(event) => setPassword(event.target.value)} placeholder={isPasswordRecovery ? 'New password (at least 8 characters)' : 'Password'} className="w-full rounded-xl border border-[var(--line)] bg-[var(--soft)] px-4 py-3 pr-11 text-sm outline-none focus:border-[var(--accent)]" /><button type="button" onClick={() => setPasswordVisible((visible) => !visible)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-[var(--muted)] hover:bg-[var(--soft)] hover:text-[var(--heading)]" aria-label={passwordVisible ? 'Hide password' : 'Show password'}>{passwordVisible ? <EyeOff size={16} /> : <Eye size={16} />}</button></div>
+              <button disabled={isSigningIn} className="w-full rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">{isSigningIn ? 'Please wait...' : isPasswordRecovery ? 'Update password' : 'Sign in'}</button>
+              {!isPasswordRecovery && <div className="text-end text-sm">
+                <button type="button" disabled={isSendingReset} onClick={() => void sendPasswordReset()} className="text-[var(--muted)] hover:text-[var(--heading)] disabled:opacity-60">{isSendingReset ? 'Sending link...' : 'Forgot password?'}</button>
+              </div>}
             </div>
           )}
           {authError && <p className="mt-4 text-sm text-rose-400">{authError}</p>}
+          {authNotice && <p className="mt-4 text-sm text-emerald-400">{authNotice}</p>}
+          {supabaseConfigured && !isPasswordRecovery && <p className="mt-4 text-xs leading-5 text-[var(--muted)]">First-time setup: create the administrator in Supabase Authentication and assign the admin role using the project setup instructions.</p>}
           <a href="/" className="mt-6 inline-flex text-sm font-medium text-[var(--muted)] hover:text-[var(--heading)]">Back to website</a>
         </form>
       </div>
@@ -202,7 +243,7 @@ export function AdminDashboard({ language, theme, setTheme, setLanguage }: Admin
       </aside>
       {sidebarOpen && <button className="fixed inset-0 z-40 bg-slate-950/60 lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="Close navigation overlay" />}
       <main className="lg:pl-72"><header className="sticky top-0 z-30 flex items-center justify-between border-b border-[var(--line)] bg-[var(--header)]/90 px-4 py-4 backdrop-blur-xl sm:px-8"><button onClick={() => setSidebarOpen(true)} className="rounded-xl border border-[var(--line)] p-2 text-[var(--heading)] lg:hidden" aria-label="Open sidebar"><Menu size={18} /></button><div className="hidden lg:block"><p className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Admin workspace</p><h1 className="mt-1 text-xl font-bold text-[var(--heading)]">{nav.find((item) => item.id === section)?.label}</h1></div><div className="ml-auto flex items-center gap-2"><button onClick={() => setLanguage(language === 'en' ? 'ar' : 'en')} className="rounded-xl border border-[var(--line)] px-3 py-2 text-xs font-semibold">{language === 'en' ? 'AR' : 'EN'}</button><button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="rounded-xl border border-[var(--line)] px-3 py-2 text-xs font-semibold">{theme === 'dark' ? 'Light' : 'Dark'}</button><span className="hidden rounded-xl bg-[var(--soft)] px-3 py-2 text-xs text-[var(--muted)] sm:inline">{user.email}</span></div></header>
-        <div className="mx-auto max-w-7xl p-4 sm:p-8">{section === 'overview' ? <Overview counts={counts} recentProjects={records.projects.slice(0, 4)} messages={messages.slice(0, 4)} /> : section === 'messages' ? <Messages records={messages} onStatusChange={(record, status) => void updateMessageStatus(record, status)} onDelete={(record) => void removeMessage(record)} /> : section === 'media' ? <Placeholder title="Media Library" description="Upload and manage portfolio media through Firebase Storage. The storage foundation is ready for your Firebase project." icon={Image} /> : section === 'settings' ? <SettingsPanel /> : section === 'ai' ? <Placeholder title="AI Assistant" description="Configure the assistant name, model behavior, suggested questions, and knowledge collections in Firestore." icon={Sparkles} /> : <CollectionManager section={section} records={visibleRecords} search={search} setSearch={setSearch} onCreate={() => setEditing({ collection: section, record: { ...emptyRecord[section] } })} onEdit={(record) => setEditing({ collection: section, record: Object.fromEntries(Object.entries(emptyRecord[section]).map(([key]) => [key, inputValue(record[key])])), id: record.id })} onDelete={(record) => void removeRecord(section, record)} />}</div>
+        <div className="mx-auto max-w-7xl p-4 sm:p-8">{section === 'overview' ? <Overview counts={counts} recentProjects={records.projects.slice(0, 4)} messages={messages.slice(0, 4)} /> : section === 'messages' ? <Messages records={messages} onStatusChange={(record, status) => void updateMessageStatus(record, status)} onDelete={(record) => void removeMessage(record)} /> : section === 'media' ? <Placeholder title="Media Library" description="Upload and manage portfolio media through Supabase Storage." icon={Image} /> : section === 'settings' ? <SettingsPanel /> : section === 'ai' ? <Placeholder title="AI Assistant" description="Configure the assistant name, model behavior, suggested questions, and knowledge collections in the CMS." icon={Sparkles} /> : <CollectionManager section={section} records={visibleRecords} search={search} setSearch={setSearch} onCreate={() => setEditing({ collection: section, record: { ...emptyRecord[section] } })} onEdit={(record) => setEditing({ collection: section, record: Object.fromEntries(Object.entries(emptyRecord[section]).map(([key]) => [key, inputValue(record[key])])), id: record.id })} onDelete={(record) => void removeRecord(section, record)} />}</div>
       </main>
       {editing && (editing.collection === 'projects' ? <ProjectEditor record={editing.record} id={editing.id} onChange={(key, value) => setEditing((current) => current ? { ...current, record: { ...current.record, [key]: value } } : current)} onSave={() => void saveRecord()} onClose={() => setEditing(null)} onToast={setToast} /> : <Editor collection={editing.collection} record={editing.record} onChange={(key, value) => setEditing((current) => current ? { ...current, record: { ...current.record, [key]: value } } : current)} onSave={() => void saveRecord()} onClose={() => setEditing(null)} />)}
       {toast && <div className="fixed bottom-5 right-5 z-[70] rounded-xl border border-[var(--line)] bg-[var(--card)] px-4 py-3 text-sm text-[var(--heading)] shadow-xl">{toast}</div>}
@@ -212,11 +253,11 @@ export function AdminDashboard({ language, theme, setTheme, setLanguage }: Admin
 
 function Overview({ counts, recentProjects, messages }: { counts: Record<string, number>; recentProjects: CmsRecord[]; messages: CmsRecord[] }) {
   const cards = [{ label: 'Projects', value: counts.projects, icon: FolderKanban }, { label: 'Skills', value: counts.skills, icon: Sparkles }, { label: 'Services', value: counts.services, icon: Settings }, { label: 'Messages', value: counts.messages, icon: MessageSquare }]
-  return <div><div className="mb-8"><p className="text-sm text-[var(--muted)]">A live view of your portfolio content.</p><h2 className="mt-2 text-3xl font-black tracking-[-0.05em] text-[var(--heading)]">Good to see you.</h2></div><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map((card) => { const Icon = card.icon; return <div key={card.label} className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5"><Icon size={18} className="text-[var(--accent)]" /><p className="mt-6 text-sm text-[var(--muted)]">{card.label}</p><p className="mt-1 text-3xl font-black text-[var(--heading)]">{card.value}</p></div> })}</div><div className="mt-8 grid gap-6 xl:grid-cols-2"><div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6"><h3 className="font-semibold text-[var(--heading)]">Recent projects</h3><div className="mt-5 space-y-3">{recentProjects.length ? recentProjects.map((item) => <div key={item.id} className="flex items-center justify-between border-b border-[var(--line)] pb-3 text-sm"><span className="text-[var(--heading)]">{item.title || item.name}</span><span className="text-xs text-[var(--muted)]">{item.published ? 'Published' : 'Draft'}</span></div>) : <p className="text-sm text-[var(--muted)]">No projects have been added to Firestore yet.</p>}</div></div><div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6"><h3 className="font-semibold text-[var(--heading)]">Recent messages</h3><div className="mt-5 space-y-3">{messages.length ? messages.map((item) => <div key={item.id} className="border-b border-[var(--line)] pb-3"><p className="text-sm text-[var(--heading)]">{item.name || 'Visitor'}</p><p className="mt-1 truncate text-xs text-[var(--muted)]">{item.subject || item.message}</p></div>) : <p className="text-sm text-[var(--muted)]">No contact messages yet.</p>}</div></div></div></div>
+  return <div><div className="mb-8"><p className="text-sm text-[var(--muted)]">A live view of your portfolio content.</p><h2 className="mt-2 text-3xl font-black tracking-[-0.05em] text-[var(--heading)]">Good to see you.</h2></div><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map((card) => { const Icon = card.icon; return <div key={card.label} className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5"><Icon size={18} className="text-[var(--accent)]" /><p className="mt-6 text-sm text-[var(--muted)]">{card.label}</p><p className="mt-1 text-3xl font-black text-[var(--heading)]">{card.value}</p></div> })}</div><div className="mt-8 grid gap-6 xl:grid-cols-2"><div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6"><h3 className="font-semibold text-[var(--heading)]">Recent projects</h3><div className="mt-5 space-y-3">{recentProjects.length ? recentProjects.map((item) => <div key={item.id} className="flex items-center justify-between border-b border-[var(--line)] pb-3 text-sm"><span className="text-[var(--heading)]">{inputValue(item.title) || inputValue(item.name)}</span><span className="text-xs text-[var(--muted)]">{item.published ? 'Published' : 'Draft'}</span></div>) : <p className="text-sm text-[var(--muted)]">No projects have been added to the CMS yet.</p>}</div></div><div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6"><h3 className="font-semibold text-[var(--heading)]">Recent messages</h3><div className="mt-5 space-y-3">{messages.length ? messages.map((item) => <div key={item.id} className="border-b border-[var(--line)] pb-3"><p className="text-sm text-[var(--heading)]">{inputValue(item.name) || 'Visitor'}</p><p className="mt-1 truncate text-xs text-[var(--muted)]">{inputValue(item.subject) || inputValue(item.message)}</p></div>) : <p className="text-sm text-[var(--muted)]">No contact messages yet.</p>}</div></div></div></div>
 }
 
 function CollectionManager({ section, records, search, setSearch, onCreate, onEdit, onDelete }: { section: CollectionSection; records: CmsRecord[]; search: string; setSearch: (value: string) => void; onCreate: () => void; onEdit: (record: CmsRecord) => void; onDelete: (record: CmsRecord) => void }) {
-  return <div><div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-sm text-[var(--muted)]">Firestore collection: {collectionNames[section]}</p><h2 className="mt-2 text-3xl font-black capitalize tracking-[-0.05em] text-[var(--heading)]">{section}</h2></div><button onClick={onCreate} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white"><Plus size={16} />Add {section.slice(0, -1)}</button></div><div className="mt-8 flex items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--card)] px-4 py-3"><Search size={16} className="text-[var(--muted)]" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={`Search ${section}...`} className="w-full bg-transparent text-sm outline-none placeholder:text-[var(--muted)]" /></div><div className="mt-4 overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--card)]"><div className="hidden grid-cols-[1fr_150px_100px_90px] gap-4 border-b border-[var(--line)] px-5 py-3 text-xs uppercase tracking-[0.16em] text-[var(--muted)] sm:grid"><span>Name</span><span>Status</span><span>Order</span><span /></div>{records.length ? records.map((record) => <div key={record.id} className="grid gap-3 border-b border-[var(--line)] px-5 py-4 last:border-0 sm:grid-cols-[1fr_150px_100px_90px] sm:items-center sm:gap-4"><div><p className="font-medium text-[var(--heading)]">{record.title || record.name || 'Untitled'}</p><p className="mt-1 text-xs text-[var(--muted)]">{record.slug || record.description || record.category || 'No additional details'}</p></div><span className="text-xs text-[var(--muted)]">{record.published === false || record.enabled === false ? 'Draft / disabled' : 'Active'}</span><span className="text-xs text-[var(--muted)]">{String(record.order ?? 0)}</span><div className="flex gap-1"><button onClick={() => onEdit(record)} className="rounded-lg p-2 text-[var(--muted)] hover:bg-[var(--soft)] hover:text-[var(--heading)]" aria-label="Edit"><Pencil size={15} /></button><button onClick={() => onDelete(record)} className="rounded-lg p-2 text-rose-300 hover:bg-rose-400/10" aria-label="Delete"><Trash2 size={15} /></button></div></div>) : <div className="px-5 py-12 text-center text-sm text-[var(--muted)]">No records found. Add your first {section.slice(0, -1)}.</div>}</div></div>
+  return <div><div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-sm text-[var(--muted)]">CMS collection: {collectionNames[section]}</p><h2 className="mt-2 text-3xl font-black capitalize tracking-[-0.05em] text-[var(--heading)]">{section}</h2></div><button onClick={onCreate} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white"><Plus size={16} />Add {section.slice(0, -1)}</button></div><div className="mt-8 flex items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--card)] px-4 py-3"><Search size={16} className="text-[var(--muted)]" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={`Search ${section}...`} className="w-full bg-transparent text-sm outline-none placeholder:text-[var(--muted)]" /></div><div className="mt-4 overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--card)]"><div className="hidden grid-cols-[1fr_150px_100px_90px] gap-4 border-b border-[var(--line)] px-5 py-3 text-xs uppercase tracking-[0.16em] text-[var(--muted)] sm:grid"><span>Name</span><span>Status</span><span>Order</span><span /></div>{records.length ? records.map((record) => <div key={record.id} className="grid gap-3 border-b border-[var(--line)] px-5 py-4 last:border-0 sm:grid-cols-[1fr_150px_100px_90px] sm:items-center sm:gap-4"><div><p className="font-medium text-[var(--heading)]">{inputValue(record.title) || inputValue(record.name) || 'Untitled'}</p><p className="mt-1 text-xs text-[var(--muted)]">{inputValue(record.slug) || inputValue(record.description) || inputValue(record.category) || 'No additional details'}</p></div><span className="text-xs text-[var(--muted)]">{record.published === false || record.enabled === false ? 'Draft / disabled' : 'Active'}</span><span className="text-xs text-[var(--muted)]">{inputValue(record.order) || '0'}</span><div className="flex gap-1"><button onClick={() => onEdit(record)} className="rounded-lg p-2 text-[var(--muted)] hover:bg-[var(--soft)] hover:text-[var(--heading)]" aria-label="Edit"><Pencil size={15} /></button><button onClick={() => onDelete(record)} className="rounded-lg p-2 text-rose-300 hover:bg-rose-400/10" aria-label="Delete"><Trash2 size={15} /></button></div></div>) : <div className="px-5 py-12 text-center text-sm text-[var(--muted)]">No records found. Add your first {section.slice(0, -1)}.</div>}</div></div>
 }
 
 function ProjectEditor({ record, id, onChange, onSave, onClose, onToast }: { record: Record<string, string>; id?: string; onChange: (key: string, value: string) => void; onSave: () => void; onClose: () => void; onToast: (message: string) => void }) {
@@ -262,12 +303,13 @@ function ProjectEditor({ record, id, onChange, onSave, onClose, onToast }: { rec
 }
 
 function Editor({ collection, record, onChange, onSave, onClose }: { collection: CollectionSection; record: Record<string, string>; onChange: (key: string, value: string) => void; onSave: () => void; onClose: () => void }) {
-  return <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-950/70 p-0 sm:items-center sm:p-6"><div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl border border-[var(--line)] bg-[var(--bg-elevated)] p-6 sm:rounded-3xl"><div className="flex items-center justify-between"><div><p className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Firestore editor</p><h2 className="mt-2 text-2xl font-bold capitalize text-[var(--heading)]">{collection.slice(0, -1)} details</h2></div><button onClick={onClose} className="rounded-xl p-2 text-[var(--muted)] hover:bg-[var(--soft)]" aria-label="Close editor"><X size={18} /></button></div><div className="mt-6 grid gap-4 sm:grid-cols-2">{Object.entries(record).map(([key, value]) => <label key={key} className="flex flex-col gap-2 text-sm font-medium capitalize text-[var(--heading)]"><span>{key}</span>{key === 'description' || key === 'shortDescription' ? <textarea rows={4} value={value} onChange={(event) => onChange(key, event.target.value)} className="rounded-xl border border-[var(--line)] bg-[var(--soft)] px-3 py-2 outline-none focus:border-[var(--accent)]" /> : <input value={value} onChange={(event) => onChange(key, event.target.value)} className="rounded-xl border border-[var(--line)] bg-[var(--soft)] px-3 py-2 outline-none focus:border-[var(--accent)]" />}</label>)}</div><div className="mt-6 flex justify-end gap-3"><button onClick={onClose} className="rounded-xl border border-[var(--line)] px-4 py-2.5 text-sm">Cancel</button><button onClick={onSave} className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white"><Save size={16} />Save</button></div></div></div>
+  return <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-950/70 p-0 sm:items-center sm:p-6"><div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl border border-[var(--line)] bg-[var(--bg-elevated)] p-6 sm:rounded-3xl"><div className="flex items-center justify-between"><div><p className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">CMS editor</p><h2 className="mt-2 text-2xl font-bold capitalize text-[var(--heading)]">{collection.slice(0, -1)} details</h2></div><button onClick={onClose} className="rounded-xl p-2 text-[var(--muted)] hover:bg-[var(--soft)]" aria-label="Close editor"><X size={18} /></button></div><div className="mt-6 grid gap-4 sm:grid-cols-2">{Object.entries(record).map(([key, value]) => <label key={key} className="flex flex-col gap-2 text-sm font-medium capitalize text-[var(--heading)]"><span>{key}</span>{key === 'description' || key === 'shortDescription' ? <textarea rows={4} value={value} onChange={(event) => onChange(key, event.target.value)} className="rounded-xl border border-[var(--line)] bg-[var(--soft)] px-3 py-2 outline-none focus:border-[var(--accent)]" /> : <input value={value} onChange={(event) => onChange(key, event.target.value)} className="rounded-xl border border-[var(--line)] bg-[var(--soft)] px-3 py-2 outline-none focus:border-[var(--accent)]" />}</label>)}</div><div className="mt-6 flex justify-end gap-3"><button onClick={onClose} className="rounded-xl border border-[var(--line)] px-4 py-2.5 text-sm">Cancel</button><button onClick={onSave} className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white"><Save size={16} />Save</button></div></div></div>
 }
 
 function Messages({ records, onStatusChange, onDelete }: { records: CmsRecord[]; onStatusChange: (record: CmsRecord, status: 'unread' | 'read' | 'replied' | 'archived') => void; onDelete: (record: CmsRecord) => void }) {
-  return <div><h2 className="text-3xl font-black tracking-[-0.05em] text-[var(--heading)]">Messages</h2><p className="mt-2 text-sm text-[var(--muted)]">Private contact messages from the portfolio.</p><div className="mt-8 space-y-3">{records.length ? records.map((record) => <article key={record.id} className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5"><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold text-[var(--heading)]">{record.subject || 'No subject'}</h3><span className="rounded-full bg-[var(--soft)] px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-[var(--muted)]">{record.status || 'unread'}</span></div><p className="mt-1 text-xs text-[var(--muted)]">{record.name} · {record.email} · {record.date || 'Date pending'} {record.time || ''}</p></div><div className="flex flex-wrap items-center gap-1"><a href={`mailto:${record.email}?subject=Re: ${encodeURIComponent(record.subject || 'Your message')}`} className="rounded-lg p-2 text-[var(--muted)] hover:bg-[var(--soft)] hover:text-[var(--heading)]" aria-label="Reply via email" title="Reply via email"><Mail size={16} /></a><button onClick={() => onStatusChange(record, record.status === 'read' ? 'unread' : 'read')} className="rounded-lg p-2 text-[var(--muted)] hover:bg-[var(--soft)] hover:text-[var(--heading)]" aria-label="Toggle read status" title="Mark read or unread"><Check size={16} /></button><button onClick={() => onStatusChange(record, 'archived')} className="rounded-lg p-2 text-[var(--muted)] hover:bg-[var(--soft)] hover:text-[var(--heading)]" aria-label="Archive message" title="Archive"><Archive size={16} /></button><button onClick={() => onDelete(record)} className="rounded-lg p-2 text-rose-300 hover:bg-rose-400/10" aria-label="Delete message" title="Delete"><Trash2 size={16} /></button></div></div><p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-[var(--muted)]">{record.message}</p></article>) : <div className="rounded-2xl border border-dashed border-[var(--line)] p-12 text-center text-sm text-[var(--muted)]">No messages yet.</div>}</div></div>
+  return <div><h2 className="text-3xl font-black tracking-[-0.05em] text-[var(--heading)]">Messages</h2><p className="mt-2 text-sm text-[var(--muted)]">Private contact messages from the portfolio.</p><div className="mt-8 space-y-3">{records.length ? records.map((record) => <article key={record.id} className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5"><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold text-[var(--heading)]">{inputValue(record.subject) || 'No subject'}</h3><span className="rounded-full bg-[var(--soft)] px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-[var(--muted)]">{inputValue(record.status) || 'unread'}</span></div><p className="mt-1 text-xs text-[var(--muted)]">{inputValue(record.name)} · {inputValue(record.email)} · {inputValue(record.date) || 'Date pending'} {inputValue(record.time)}</p></div><div className="flex flex-wrap items-center gap-1"><a href={`mailto:${inputValue(record.email)}?subject=Re: ${encodeURIComponent(inputValue(record.subject) || 'Your message')}`} className="rounded-lg p-2 text-[var(--muted)] hover:bg-[var(--soft)] hover:text-[var(--heading)]" aria-label="Reply via email" title="Reply via email"><Mail size={16} /></a><button onClick={() => onStatusChange(record, record.status === 'read' ? 'unread' : 'read')} className="rounded-lg p-2 text-[var(--muted)] hover:bg-[var(--soft)] hover:text-[var(--heading)]" aria-label="Toggle read status" title="Mark read or unread"><Check size={16} /></button><button onClick={() => onStatusChange(record, 'archived')} className="rounded-lg p-2 text-[var(--muted)] hover:bg-[var(--soft)] hover:text-[var(--heading)]" aria-label="Archive message" title="Archive"><Archive size={16} /></button><button onClick={() => onDelete(record)} className="rounded-lg p-2 text-rose-300 hover:bg-rose-400/10" aria-label="Delete message" title="Delete"><Trash2 size={16} /></button></div></div><p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-[var(--muted)]">{inputValue(record.message)}</p></article>) : <div className="rounded-2xl border border-dashed border-[var(--line)] p-12 text-center text-sm text-[var(--muted)]">No messages yet.</div>}</div></div>
 }
 
-function Placeholder({ title, description, icon: Icon }: { title: string; description: string; icon: typeof Image }) { return <div className="max-w-2xl"><Icon size={22} className="text-[var(--accent)]" /><h2 className="mt-5 text-3xl font-black tracking-[-0.05em] text-[var(--heading)]">{title}</h2><p className="mt-3 text-sm leading-7 text-[var(--muted)]">{description}</p><div className="mt-8 rounded-2xl border border-dashed border-[var(--line)] bg-[var(--card)] p-8 text-sm text-[var(--muted)]">This module is connected to the CMS architecture and ready for Firebase data.</div></div> }
-function SettingsPanel() { return <div><h2 className="text-3xl font-black tracking-[-0.05em] text-[var(--heading)]">Site Settings</h2><p className="mt-2 text-sm text-[var(--muted)]">Safe site-wide settings are stored in Firestore when configured.</p><div className="mt-8 grid gap-4 sm:grid-cols-2"><div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5"><p className="text-sm font-semibold text-[var(--heading)]">Public website</p><p className="mt-2 text-sm text-emerald-400">Online</p></div><div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5"><p className="text-sm font-semibold text-[var(--heading)]">Authentication</p><p className="mt-2 text-sm text-emerald-400">Firebase protected</p></div></div></div> }
+function Placeholder({ title, description, icon: Icon }: { title: string; description: string; icon: typeof Image }) { return <div className="max-w-2xl"><Icon size={22} className="text-[var(--accent)]" /><h2 className="mt-5 text-3xl font-black tracking-[-0.05em] text-[var(--heading)]">{title}</h2><p className="mt-3 text-sm leading-7 text-[var(--muted)]">{description}</p><div className="mt-8 rounded-2xl border border-dashed border-[var(--line)] bg-[var(--card)] p-8 text-sm text-[var(--muted)]">This module is connected to the CMS architecture and ready for Supabase data.</div></div> }
+
+function SettingsPanel() { return <div><h2 className="text-3xl font-black tracking-[-0.05em] text-[var(--heading)]">Site Settings</h2><p className="mt-2 text-sm text-[var(--muted)]">Safe site-wide settings are stored in Supabase when configured.</p><div className="mt-8 grid gap-4 sm:grid-cols-2"><div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5"><p className="text-sm font-semibold text-[var(--heading)]">Public website</p><p className="mt-2 text-sm text-emerald-400">Online</p></div><div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5"><p className="text-sm font-semibold text-[var(--heading)]">Authentication</p><p className="mt-2 text-sm text-emerald-400">Supabase protected</p></div></div></div> }

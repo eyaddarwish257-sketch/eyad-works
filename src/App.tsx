@@ -37,7 +37,7 @@ import {
 import { AIChatbot } from './components/AIChatbot'
 import { AdminDashboard } from './components/AdminDashboard'
 import { createCmsRecord, subscribeToPublishedProjects, type CmsRecord } from './lib/cms'
-import { auth, db } from './lib/firebase'
+import { supabaseConfigured } from './lib/supabase'
 import {
   contactLinks,
   portfolioContent,
@@ -149,7 +149,7 @@ function PortfolioApp() {
   const [cmsProjects, setCmsProjects] = useState<Project[]>([])
 
   useEffect(() => {
-    if (!db) return
+    if (!supabaseConfigured) return
     return subscribeToPublishedProjects((records) => setCmsProjects(records.map(toPublicProject)), () => setCmsProjects([]))
   }, [])
 
@@ -486,7 +486,7 @@ function HomePage({
           <div className="flex justify-center border-t border-[var(--line)] pt-4">
             <button
               type="button"
-              onClick={() => navigate(auth?.currentUser ? '/admin' : '/admin/login')}
+              onClick={() => navigate('/admin/login')}
               className="group relative rounded-full p-1 text-[var(--muted)]/40 transition hover:text-[var(--muted)] hover:-translate-y-0.5"
               aria-label="Admin Login"
             >
@@ -724,7 +724,7 @@ function ContactSection({ content }: { language?: Language; content: (typeof por
     setIsSending(true)
     const submittedAt = new Date()
 
-    if (db) {
+    if (supabaseConfigured) {
       try {
         await createCmsRecord('messages', {
           ...normalizedForm,
@@ -741,7 +741,9 @@ function ContactSection({ content }: { language?: Language; content: (typeof por
     }
 
     if (!emailEnabled) {
-      setStatus('Message saved, but email delivery is not configured yet. Please contact me directly using the links below.')
+      setStatus(supabaseConfigured
+        ? 'Message saved, but email delivery is not configured yet. Please contact me directly using the links below.'
+        : 'Email delivery and message storage are not configured yet. Please contact me directly using the links below.')
       setIsSending(false)
       return
     }
