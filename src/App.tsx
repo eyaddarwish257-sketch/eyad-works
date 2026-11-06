@@ -36,6 +36,7 @@ import {
 } from 'simple-icons'
 import { AIChatbot } from './components/AIChatbot'
 import { AdminDashboard } from './components/AdminDashboard'
+import { AdminPasswordReset } from './components/AdminPasswordReset'
 import { createCmsRecord, subscribeToPublishedProjects, type CmsRecord } from './lib/cms'
 import { supabaseConfigured } from './lib/supabase'
 import {
@@ -224,6 +225,7 @@ function PortfolioApp() {
           path="/admin/login"
           element={<AdminDashboard language={language} theme={theme} setTheme={setTheme} setLanguage={setLanguage} />}
         />
+        <Route path="/admin/reset-password" element={<AdminPasswordReset />} />
         <Route path="*" element={<NotFoundPage language={language} theme={theme} setTheme={setTheme} setLanguage={setLanguage} content={content} />} />
       </Routes>
       <AIChatbot language={language} />

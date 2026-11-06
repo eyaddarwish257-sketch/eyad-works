@@ -17,7 +17,11 @@ Portfolio website and admin CMS built with React, Vite, and Supabase.
 
    The older Supabase `anon` key is also accepted as `VITE_SUPABASE_ANON_KEY`. Never put a Supabase secret or service-role key in a `VITE_` variable or browser code.
 
-5. In Supabase **Authentication → URL Configuration**, set the production site URL and add the local and deployed admin login URLs to the redirect allow list.
+5. In Supabase **Authentication → URL Configuration**, set the production site URL and add both admin login and password-reset URLs for localhost and the deployed domain to the redirect allow list:
+   - `http://localhost:5173/admin/login`
+   - `http://localhost:5173/admin/reset-password`
+   - `https://eyad-works.vercel.app/admin/login`
+   - `https://eyad-works.vercel.app/admin/reset-password`
 6. In Supabase **Authentication → Users**, create the administrator using the email in `VITE_ADMIN_EMAIL`. Require email confirmation in the Supabase Auth settings.
 7. Grant the admin role to that user in the Supabase SQL Editor:
 
@@ -29,7 +33,7 @@ Portfolio website and admin CMS built with React, Vite, and Supabase.
 
    Confirm that exactly one user row was updated. The admin role is stored in protected app metadata, not client-editable user metadata. If you change `VITE_ADMIN_EMAIL`, use that same address in this SQL.
 8. For live AI portfolio context in the chat function, also configure `SUPABASE_URL` and either `SUPABASE_PUBLISHABLE_KEY` or `SUPABASE_ANON_KEY` as server environment variables. Do not use a service-role key.
-9. Deploy the site. Sign in at `/admin/login`; use **Forgot password?** if you need to set or reset the password.
+9. Deploy the site. Sign in at `/admin/login`; **Forgot password?** sends a recovery link to `/admin/reset-password`, where the administrator can set a new password.
 
 The database migration enables row-level security: visitors can read published projects and submit contact messages; only the configured admin can manage CMS records or upload/delete project images. Do not disable these policies or expose service-role credentials.
 

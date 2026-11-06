@@ -48,6 +48,9 @@ function inputValue(value: unknown) {
 }
 
 export function AdminDashboard({ language, theme, setTheme, setLanguage }: AdminDashboardProps) {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || '').trim().toLowerCase()
   const [user, setUser] = useState<User | null>(null)
   const [authLoading, setAuthLoading] = useState(Boolean(supabaseConfigured && supabase))
   const [email, setEmail] = useState(import.meta.env.VITE_ADMIN_EMAIL || '')
@@ -55,9 +58,12 @@ export function AdminDashboard({ language, theme, setTheme, setLanguage }: Admin
   const [passwordVisible, setPasswordVisible] = useState(false)
   const [isSigningIn, setIsSigningIn] = useState(false)
   const [isSendingReset, setIsSendingReset] = useState(false)
-  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false)
   const [authError, setAuthError] = useState('')
-  const [authNotice, setAuthNotice] = useState('')
+  const [authNotice, setAuthNotice] = useState(() => (
+    (location.state as { passwordUpdated?: boolean } | null)?.passwordUpdated
+      ? 'Password updated. Sign in with your new password.'
+      : ''
+  ))
   const [section, setSection] = useState<Section>('overview')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [toast, setToast] = useState('')
@@ -65,10 +71,6 @@ export function AdminDashboard({ language, theme, setTheme, setLanguage }: Admin
   const [messages, setMessages] = useState<CmsRecord[]>([])
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<{ collection: CollectionSection; record: Record<string, string>; id?: string } | null>(null)
-    const location = useLocation()
-    const navigate = useNavigate()
-    const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || '').trim().toLowerCase()
-
     useEffect(() => {
       const client = supabase
       if (!supabaseConfigured || !client) return
@@ -84,11 +86,12 @@ export function AdminDashboard({ language, theme, setTheme, setLanguage }: Admin
         setUser(isAuthorized ? nextUser : null)
         setAuthLoading(false)
 
-        if (event === 'PASSWORD_RECOVERY') setIsPasswordRecovery(true)
         if (nextUser && !isAuthorized) {
           window.setTimeout(() => { void client.auth.signOut() }, 0)
           setAuthError('This account is not authorized to access the admin dashboard.')
-        } else if (nextUser && location.pathname === '/admin/login' && event !== 'PASSWORD_RECOVERY') {
+        } else if (event === 'PASSWORD_RECOVERY') {
+          navigate('/admin/reset-password', { replace: true, state: { recoverySessionEstablished: true } })
+        } else if (nextUser && location.pathname === '/admin/login') {
           navigate('/admin', { replace: true })
         } else if (!nextUser && location.pathname === '/admin') {
           navigate('/admin/login', { replace: true })
@@ -119,19 +122,6 @@ export function AdminDashboard({ language, theme, setTheme, setLanguage }: Admin
       setAuthError('')
       setAuthNotice('')
       setIsSigningIn(true)
-
-      if (isPasswordRecovery) {
-        const { error } = await supabase.auth.updateUser({ password })
-        if (error) {
-          setAuthError(error.message)
-        } else {
-          setIsPasswordRecovery(false)
-          setPassword('')
-          setAuthNotice('Password updated. You can now sign in.')
-        }
-        return
-      }
-
       const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
       if (error) setAuthError('Admin account not found or password incorrect. Create the user in Supabase Auth or reset its password.')
     } catch (error) {
@@ -153,7 +143,7 @@ export function AdminDashboard({ language, theme, setTheme, setLanguage }: Admin
       setAuthNotice('')
       setIsSendingReset(true)
       const { error } = await supabase.auth.resetPasswordForEmail(adminEmail, {
-        redirectTo: `${window.location.origin}/admin/login`,
+        redirectTo: `${window.location.origin}/admin/reset-password`,
       })
       if (error) throw error
       setAuthNotice('If an admin account exists, a password reset link has been sent to its email.')
@@ -203,27 +193,27 @@ export function AdminDashboard({ language, theme, setTheme, setLanguage }: Admin
   }
 
   if (authLoading) return <div className="flex min-h-screen items-center justify-center bg-[var(--bg)] text-sm text-[var(--muted)]">Loading secure dashboard...</div>
-  if (!supabaseConfigured || !user || isPasswordRecovery) {
+  if (!supabaseConfigured || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--bg)] px-4 text-[var(--text)]">
         <form onSubmit={login} className="w-full max-w-md rounded-[2rem] border border-[var(--line)] bg-[var(--card)] p-8 shadow-[var(--shadow-soft)]">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--accent)] text-white"><ShieldCheck size={22} /></div>
           <p className="mt-8 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">Eyad Works CMS</p>
-          <h1 className="mt-3 text-3xl font-black tracking-[-0.05em] text-[var(--heading)]">{isPasswordRecovery ? 'Set a new password' : 'Secure admin access'}</h1>
+          <h1 className="mt-3 text-3xl font-black tracking-[-0.05em] text-[var(--heading)]">Secure admin access</h1>
           <p className="mt-3 text-sm leading-6 text-[var(--muted)]">Sign in with the configured Supabase administrator account.</p>
           {!supabaseConfigured || !adminEmail ? <p className="mt-6 rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-200">Admin authentication is not configured. Add VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY, and VITE_ADMIN_EMAIL.</p> : (
             <div className="mt-6 space-y-4">
-              <input required type="email" value={email} disabled={isPasswordRecovery} onChange={(event) => setEmail(event.target.value)} placeholder="Admin email" className="w-full rounded-xl border border-[var(--line)] bg-[var(--soft)] px-4 py-3 text-sm outline-none focus:border-[var(--accent)] disabled:opacity-60" />
-              <div className="relative"><input required minLength={isPasswordRecovery ? 8 : undefined} type={passwordVisible ? 'text' : 'password'} value={password} onChange={(event) => setPassword(event.target.value)} placeholder={isPasswordRecovery ? 'New password (at least 8 characters)' : 'Password'} className="w-full rounded-xl border border-[var(--line)] bg-[var(--soft)] px-4 py-3 pr-11 text-sm outline-none focus:border-[var(--accent)]" /><button type="button" onClick={() => setPasswordVisible((visible) => !visible)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-[var(--muted)] hover:bg-[var(--soft)] hover:text-[var(--heading)]" aria-label={passwordVisible ? 'Hide password' : 'Show password'}>{passwordVisible ? <EyeOff size={16} /> : <Eye size={16} />}</button></div>
-              <button disabled={isSigningIn} className="w-full rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">{isSigningIn ? 'Please wait...' : isPasswordRecovery ? 'Update password' : 'Sign in'}</button>
-              {!isPasswordRecovery && <div className="text-end text-sm">
+              <input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Admin email" className="w-full rounded-xl border border-[var(--line)] bg-[var(--soft)] px-4 py-3 text-sm outline-none focus:border-[var(--accent)]" />
+              <div className="relative"><input required type={passwordVisible ? 'text' : 'password'} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" className="w-full rounded-xl border border-[var(--line)] bg-[var(--soft)] px-4 py-3 pr-11 text-sm outline-none focus:border-[var(--accent)]" /><button type="button" onClick={() => setPasswordVisible((visible) => !visible)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-[var(--muted)] hover:bg-[var(--soft)] hover:text-[var(--heading)]" aria-label={passwordVisible ? 'Hide password' : 'Show password'}>{passwordVisible ? <EyeOff size={16} /> : <Eye size={16} />}</button></div>
+              <button disabled={isSigningIn} className="w-full rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">{isSigningIn ? 'Please wait...' : 'Sign in'}</button>
+              <div className="text-end text-sm">
                 <button type="button" disabled={isSendingReset} onClick={() => void sendPasswordReset()} className="text-[var(--muted)] hover:text-[var(--heading)] disabled:opacity-60">{isSendingReset ? 'Sending link...' : 'Forgot password?'}</button>
-              </div>}
+              </div>
             </div>
           )}
           {authError && <p className="mt-4 text-sm text-rose-400">{authError}</p>}
           {authNotice && <p className="mt-4 text-sm text-emerald-400">{authNotice}</p>}
-          {supabaseConfigured && !isPasswordRecovery && <p className="mt-4 text-xs leading-5 text-[var(--muted)]">Having trouble signing in? Use Forgot password? to get a recovery link at the configured administrator email.</p>}
+          {supabaseConfigured && <p className="mt-4 text-xs leading-5 text-[var(--muted)]">Having trouble signing in? Use Forgot password? to get a recovery link at the configured administrator email.</p>}
           <a href="/" className="mt-6 inline-flex text-sm font-medium text-[var(--muted)] hover:text-[var(--heading)]">Back to website</a>
         </form>
       </div>
