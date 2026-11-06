@@ -223,7 +223,7 @@ export function AdminDashboard({ language, theme, setTheme, setLanguage }: Admin
           )}
           {authError && <p className="mt-4 text-sm text-rose-400">{authError}</p>}
           {authNotice && <p className="mt-4 text-sm text-emerald-400">{authNotice}</p>}
-          {supabaseConfigured && !isPasswordRecovery && <p className="mt-4 text-xs leading-5 text-[var(--muted)]">First-time setup: create the administrator in Supabase Authentication and assign the admin role using the project setup instructions.</p>}
+          {supabaseConfigured && !isPasswordRecovery && <p className="mt-4 text-xs leading-5 text-[var(--muted)]">Having trouble signing in? Use Forgot password? to get a recovery link at the configured administrator email.</p>}
           <a href="/" className="mt-6 inline-flex text-sm font-medium text-[var(--muted)] hover:text-[var(--heading)]">Back to website</a>
         </form>
       </div>
