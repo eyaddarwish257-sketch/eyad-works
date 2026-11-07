@@ -148,6 +148,12 @@ function PortfolioApp() {
   })
   const [mobileOpen, setMobileOpen] = useState(false)
   const [cmsProjects, setCmsProjects] = useState<Project[]>([])
+  const visibleProjects = useMemo(() => {
+    const mergedProjects = new Map<string, Project>()
+    projects.forEach((project) => mergedProjects.set(project.slug, project))
+    cmsProjects.forEach((project) => mergedProjects.set(project.slug, project))
+    return Array.from(mergedProjects.values())
+  }, [cmsProjects])
 
   useEffect(() => {
     if (!supabaseConfigured) return
@@ -209,13 +215,13 @@ function PortfolioApp() {
               mobileOpen={mobileOpen}
               setMobileOpen={setMobileOpen}
               content={content}
-              projects={cmsProjects.length ? cmsProjects : projects}
+              projects={visibleProjects}
             />
           }
         />
         <Route
           path="/project/:slug"
-          element={<ProjectDetailPage language={language} theme={theme} setTheme={setTheme} setLanguage={setLanguage} content={content} projects={cmsProjects.length ? cmsProjects : projects} />}
+          element={<ProjectDetailPage language={language} theme={theme} setTheme={setTheme} setLanguage={setLanguage} content={content} projects={visibleProjects} />}
         />
         <Route
           path="/admin"

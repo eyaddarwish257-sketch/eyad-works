@@ -35,7 +35,7 @@ const collectionNames: Record<CollectionSection, string> = {
 }
 
 const emptyRecord: Record<CollectionSection, Record<string, string>> = {
-  projects: { title: '', slug: '', category: 'Web', shortDescription: '', description: '', technologies: '', coverImage: '', screenshots: '', published: 'false', featured: 'false', order: '0' },
+  projects: { title: '', slug: '', category: 'Web', shortDescription: '', description: '', technologies: '', demo: '', coverImage: '', screenshots: '', published: 'false', featured: 'false', order: '0' },
   skills: { name: '', category: 'Languages', icon: '', enabled: 'true', featured: 'false', order: '0' },
   services: { title: '', description: '', icon: '', enabled: 'true', featured: 'false', order: '0' },
   journey: { title: '', date: '', description: '', icon: '', enabled: 'true', order: '0' },
