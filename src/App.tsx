@@ -762,6 +762,9 @@ function ContactSection({ content }: { language?: Language; content: (typeof por
         to_email: contactLinks.email,
         reply_to: normalizedForm.email,
         from_name: normalizedForm.name,
+        title: normalizedForm.subject,
+        time: submittedAt.toLocaleString(),
+        message: normalizedForm.message,
         subject: `New Portfolio Contact Message: ${normalizedForm.subject}`,
         message_html: `<strong>New Portfolio Contact Message</strong><br><br>Name: ${normalizedForm.name}<br>Email: ${normalizedForm.email}<br>Subject: ${normalizedForm.subject}<br><br>Message:<br>${normalizedForm.message.replace(/\n/g, '<br>')}`,
       }, {
