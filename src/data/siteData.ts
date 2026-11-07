@@ -30,52 +30,6 @@ export type Project = {
 
 export const projects: Project[] = [
   {
-    slug: 'currency-converter',
-    name: 'Currency Converter',
-    category: 'Web',
-    description: {
-      en: 'A modern currency conversion web application supporting multiple currencies with a clean and responsive interface.',
-      ar: 'تطبيق ويب حديث لتحويل العملات يدعم عملات متعددة مع واجهة نظيفة ومتجاوبة.'
-    },
-    shortDescription: {
-      en: 'Smart exchange tool for fast, accurate currency conversions.',
-      ar: 'أداة تحويل ذكية لتحديثات سريعة ودقيقة.'
-    },
-    technologies: ['React', 'TypeScript', 'Tailwind', 'API Integration'],
-    demo: 'https://example.com',
-    image: 'from-sky-500 via-indigo-500 to-violet-600',
-    accent: '#7c3aed',
-    overview: {
-      en: 'A polished currency conversion experience designed for quick comparisons across multiple currencies and regions.',
-      ar: 'تجربة حديثة لتحويل العملات مصممة لتوفير مقارنة سريعة عبر عملات ومناطق متعددة.'
-    },
-    problem: {
-      en: 'Users needed a lightweight, trustworthy way to convert between currencies without friction or clutter.',
-      ar: 'كان المستخدمون بحاجة إلى طريقة خفيفة وموثوقة لتحويل العملات دون تعقيدات أو واجهات مزدحمة.'
-    },
-    solution: {
-      en: 'I built a responsive app with a focused interface, live conversion logic, and a clean user flow optimized for speed.',
-      ar: 'تم تطوير تطبيق متجاوب بواجهة مركزة ومنطق تحويل مباشر وتدفق مستخدم مبسط مصمم للسرعة.'
-    },
-    features: [
-      { en: 'Multi-currency conversion', ar: 'تحويل متعدد العملات' },
-      { en: 'Responsive dashboard layout', ar: 'تخطيط متجاوب' },
-      { en: 'Fast search and input flow', ar: 'بحث وسلاسة إدخال سريعة' }
-    ],
-    process: [
-      { en: 'Mapped user flow and interface priorities', ar: 'رسم تدفق المستخدم وأولويات الواجهة' },
-      { en: 'Implemented interaction logic and calculations', ar: 'تنفيذ المنطق التفاعلي والحسابات' },
-      { en: 'Refined layout and accessibility details', ar: 'تنقيح التخطيط والتفاصيل المخصصة للوصول' }
-    ],
-    challenges: [
-      { en: 'Ensuring real-time accuracy and a calm UX', ar: 'ضمان الدقة اللحظية وتجربة مستخدم هادئة' },
-      { en: 'Designing simple flows on mobile screens', ar: 'تصميم تدفقات بسيطة على الشاشات المحمولة' }
-    ],
-    results: [
-      { en: 'Delivered a clean product concept with strong usability.', ar: 'تم تقديم منتج نظيف مع تجربة استخدام قوية.' }
-    ]
-  },
-  {
     slug: 'lumiere-restaurant',
     name: 'LUMIÈRE Restaurant',
     category: 'Web',
@@ -288,52 +242,6 @@ export const projects: Project[] = [
     ],
     results: [
       { en: 'Created an entertainment-focused catalog experience consistent with the live Cima Hub project.', ar: 'تم إنشاء تجربة كتالوج ترفيهية متوافقة مع مشروع Cima Hub الفعلي.' }
-    ]
-  },
-  {
-    slug: 'fitness-coach',
-    name: 'Fitness Coach',
-    category: 'Mobile',
-    description: {
-      en: 'A fitness-focused application for workouts, nutrition, progress tracking, and personalized guidance.',
-      ar: 'تطبيق رياضي يركز على التمارين والتغذية وتتبع التقدم والإرشاد الشخصي.'
-    },
-    shortDescription: {
-      en: 'Workout companion for planning routines, tracking habits, and progress.',
-      ar: 'مرافِق تمرين لتنظيم الروتينات وتتبع العادات والتقدم.'
-    },
-    technologies: ['React Native', 'TypeScript', 'UI/UX', 'Product Design'],
-    demo: 'https://example.com',
-    image: 'from-cyan-500 via-sky-500 to-indigo-600',
-    accent: '#0ea5e9',
-    overview: {
-      en: 'A mobile-first wellness concept created to make progress tracking feel motivating and easy to maintain.',
-      ar: 'مفهوم صحي أولاً للجوال صُمم لجعل تتبع التقدم محفزًا وسهل الصيانة.'
-    },
-    problem: {
-      en: 'People need a system that keeps workouts, nutrition, and progress visible without becoming a burden.',
-      ar: 'يحتاج الناس إلى نظام يبرز التمارين والتغذية والتقدم دون أن يصبح عبئًا.'
-    },
-    solution: {
-      en: 'I built a concept with guided flows, clear metrics, and habit-friendly visuals that keep momentum high.',
-      ar: 'تم بناء مفهوم مع تدفقات موجهة ومقاييس واضحة وتصاميم مناسبة للعادات للحفاظ على الزخم.'
-    },
-    features: [
-      { en: 'Workout plans and tracking', ar: 'خطط تمارين وتتبع' },
-      { en: 'Nutrition and hydration overview', ar: 'نظرة عامة على التغذية والسوائل' },
-      { en: 'Progress-focused dashboard', ar: 'لوحة متابعة التقدم' }
-    ],
-    process: [
-      { en: 'Mapped user habits and goals', ar: 'رسم عادات المستخدم وأهدافه' },
-      { en: 'Designed a motivating health experience', ar: 'تصميم تجربة صحية محفزة' },
-      { en: 'Refined visuals and micro-interactions', ar: 'تنقيح المرئيات والتفاعلات الدقيقة' }
-    ],
-    challenges: [
-      { en: 'Making health data approachable', ar: 'جعل بيانات الصحة سهلة الفهم' },
-      { en: 'Creating a supportive visual language', ar: 'إنشاء لغة بصرية داعمة' }
-    ],
-    results: [
-      { en: 'Developed a mobile concept that balances motivation, clarity, and product polish.', ar: 'تم تطوير مفهوم جوال يوازن بين التحفيز والوضوح واللمسة الاحترافية.' }
     ]
   },
   {
